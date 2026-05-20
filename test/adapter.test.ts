@@ -85,6 +85,26 @@ class MockAdapter implements PlatformAdapter {
   ): Promise<PlatformReview[]> {
     return [];
   }
+  async createIssue(
+    _owner: string,
+    _repo: string,
+    _title: string,
+    _body: string,
+    _labels?: string[],
+  ): Promise<{ number: number; url: string }> {
+    return { number: 1, url: "https://github.com/o/r/issues/1" };
+  }
+  async createPullRequest(
+    _owner: string,
+    _repo: string,
+    _title: string,
+    _body: string,
+    _head: string,
+    _base: string,
+  ): Promise<{ number: number; url: string }> {
+    return { number: 1, url: "https://github.com/o/r/pull/1" };
+  }
+
   async createComment(
     _owner: string,
     _repo: string,

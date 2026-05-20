@@ -237,6 +237,35 @@ export class GitCodeAdapter implements PlatformAdapter {
     );
   }
 
+  async createIssue(
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    labels?: string[],
+  ): Promise<{ number: number; url: string }> {
+    const data = await this.client.post<{ number: number; html_url: string }>(
+      `/repos/${owner}/${repo}/issues`,
+      { title, body, labels },
+    );
+    return { number: data.number, url: data.html_url };
+  }
+
+  async createPullRequest(
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string,
+  ): Promise<{ number: number; url: string }> {
+    const data = await this.client.post<{ number: number; html_url: string }>(
+      `/repos/${owner}/${repo}/pulls`,
+      { title, body, head, base },
+    );
+    return { number: data.number, url: data.html_url };
+  }
+
   async getRepo(
     owner: string,
     repo: string,

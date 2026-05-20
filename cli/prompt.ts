@@ -225,6 +225,17 @@ Follow these steps:
    - Always commit your changes before reporting completion
    - If tests exist, run them before pushing
 
+   **Creating Issues and Pull Requests:**
+   - To create an Issue:
+     \`\`\`
+     bun run scripts/create-issue.ts --owner=<owner> --repo=<repo> --title="<title>" --body="<body>" [--labels="label1,label2"]
+     \`\`\`
+   - To create a Pull Request (after pushing your branch):
+     \`\`\`
+     bun run scripts/create-pr.ts --owner=<owner> --repo=<repo> --title="<title>" --body="<body>" --head=<your-branch> --base=<target-branch>
+     \`\`\`
+   - These scripts call the platform API directly using the injected token
+
 4. Final Output:
    - Provide a clear summary of what was accomplished
    - List any files changed and why

@@ -185,6 +185,11 @@ export async function runStandalone(args: CliArgs): Promise<void> {
   // Configure git authentication so Claude can commit and push
   await configureGit(adapter, args);
 
+  // Inject platform config for scripts Claude can call
+  process.env.CLAUDE_LOOP_TOKEN = args.token;
+  process.env.CLAUDE_LOOP_API_BASE = adapter.apiBaseUrl;
+  process.env.CLAUDE_LOOP_PLATFORM = adapter.platform;
+
   // Set AI provider env vars
   if (args.anthropicApiKey) {
     process.env.ANTHROPIC_API_KEY = args.anthropicApiKey;
@@ -306,7 +311,9 @@ export async function runStandalone(args: CliArgs): Promise<void> {
       promptFile,
     });
 
-    // Build allowed tools
+    // Build allowed tools — git ops + Issue/PR creation
+    const createIssuePath = join(__dirname, "..", "scripts", "create-issue.ts");
+    const createPRPath = join(__dirname, "..", "scripts", "create-pr.ts");
     const allowedTools = [
       "Bash(git add:*)",
       "Bash(git commit:*)",
@@ -314,6 +321,8 @@ export async function runStandalone(args: CliArgs): Promise<void> {
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
+      `Bash(bun run ${createIssuePath}:*)`,
+      `Bash(bun run ${createPRPath}:*)`,
     ].join(",");
 
     console.log("Running Claude...");

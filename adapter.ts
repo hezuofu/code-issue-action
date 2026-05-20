@@ -62,6 +62,23 @@ export interface PlatformAdapter {
 
   getRepo(owner: string, repo: string): Promise<{ defaultBranch: string }>;
 
+  createIssue(
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    labels?: string[],
+  ): Promise<{ number: number; url: string }>;
+
+  createPullRequest(
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string,
+  ): Promise<{ number: number; url: string }>;
+
   getUser(login: string): Promise<PlatformUser>;
 
   /** Return the sanitized HTML URL for an entity (issue or PR). */
