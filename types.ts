@@ -89,6 +89,8 @@ export interface CliArgs {
   model?: string;
   verbose: boolean;
   claudeArgs?: string;
+  includeCommentsByActor?: string;
+  excludeCommentsByActor?: string;
   serverUrl?: string;
   apiBaseUrl?: string;
 }

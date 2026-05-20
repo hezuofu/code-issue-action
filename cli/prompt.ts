@@ -91,6 +91,7 @@ export interface PromptParams {
   mode: "tag" | "agent";
   triggerPhrase: string;
   triggerUser?: string;
+  triggerName?: string | null;
   commentId?: number;
   triggerComment?: PlatformComment;
   issue?: PlatformIssue;
@@ -218,7 +219,7 @@ Follow these steps:
    - After making changes, commit and push using git commands:
      \`\`\`
      git add <files>           # Stage your changes
-     git commit -m "<message>"  # Commit with a descriptive message
+     git commit -m "<message>"  # Commit with a descriptive message${params.triggerName ? `\n     # Include Co-authored-by: git commit -m "<message>\\n\\nCo-authored-by: ${params.triggerName} <${params.triggerUser ?? "unknown"}@users.noreply.${params.platform}.com>"` : ""}
      ${params.gitPushWrapper ? `${params.gitPushWrapper} origin HEAD` : "git push origin HEAD"}  # Push to remote
      \`\`\`
    - Always commit your changes before reporting completion

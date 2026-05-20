@@ -49,6 +49,36 @@ async function configureGit(
   console.log("Git authentication configured");
 }
 
+/** Checkout PR head and fetch base ref so git diff origin/<base>...HEAD works. */
+async function setupPRBranch(pr: PlatformPullRequest): Promise<void> {
+  await $`git fetch origin ${pr.headRefName}:refs/remotes/origin/${pr.headRefName}`.nothrow();
+  await $`git checkout -B ${pr.headRefName} origin/${pr.headRefName}`.nothrow();
+  await $`git fetch origin ${pr.baseRefName}:refs/remotes/origin/${pr.baseRefName}`.nothrow();
+  console.log(
+    `PR branch: ${pr.headRefName}, base ${pr.baseRefName} ready for diff`,
+  );
+}
+
+function filterCommentsByActor<T extends { author: { login: string } }>(
+  comments: T[],
+  include?: string,
+  exclude?: string,
+): T[] {
+  const inc = include
+    ? include.split(",").map((s) => s.trim().toLowerCase())
+    : [];
+  const exc = exclude
+    ? exclude.split(",").map((s) => s.trim().toLowerCase())
+    : [];
+  if (inc.length === 0 && exc.length === 0) return comments;
+  return comments.filter((c) => {
+    const login = c.author.login.toLowerCase();
+    if (exc.length > 0 && exc.includes(login)) return false;
+    if (inc.length > 0 && !inc.includes(login)) return false;
+    return true;
+  });
+}
+
 interface FetchedData {
   entityNumber: number;
   isPR: boolean;
@@ -88,7 +118,11 @@ async function fetchTagData(
       adapter.getPullRequestReviews(owner, repo, entityNumber),
       adapter.getPullRequestFiles(owner, repo, entityNumber),
     ]);
-    comments = prComments;
+    comments = filterCommentsByActor(
+      prComments,
+      args.includeCommentsByActor,
+      args.excludeCommentsByActor,
+    );
     reviews = prReviews;
     files.push(...prFiles);
 
@@ -101,7 +135,16 @@ async function fetchTagData(
       : comments.find((c) => c.body.includes(args.triggerPhrase));
   } else {
     issue = await adapter.getIssue(owner, repo, entityNumber);
-    comments = await adapter.getIssueComments(owner, repo, entityNumber);
+    const rawComments = await adapter.getIssueComments(
+      owner,
+      repo,
+      entityNumber,
+    );
+    comments = filterCommentsByActor(
+      rawComments,
+      args.includeCommentsByActor,
+      args.excludeCommentsByActor,
+    );
 
     const userLogin = args.triggerUser;
     triggerComment = userLogin
@@ -157,6 +200,7 @@ export async function runStandalone(args: CliArgs): Promise<void> {
   let data: FetchedData | null = null;
   let claudeConclusion: "success" | "failure" | "error" = "error";
   let errorMessage: string | undefined;
+  let responseText: string | undefined;
 
   try {
     let promptContent: string;
@@ -164,6 +208,20 @@ export async function runStandalone(args: CliArgs): Promise<void> {
     if (mode === "tag") {
       data = await fetchTagData(adapter, args);
       if (!data) throw new Error("No entity data fetched");
+
+      // For PRs: checkout the PR's head branch so Claude works on the right code
+      if (data.pr) await setupPRBranch(data.pr);
+
+      // Get trigger user's display name for Co-authored-by
+      let triggerName: string | undefined;
+      if (data.triggerComment) {
+        try {
+          const user = await adapter.getUser(data.triggerComment.author.login);
+          triggerName = user.name ?? undefined;
+        } catch {
+          // display name is optional
+        }
+      }
 
       // Check for trigger
       const hasTrigger =
@@ -200,6 +258,7 @@ export async function runStandalone(args: CliArgs): Promise<void> {
         mode: "tag",
         triggerPhrase: args.triggerPhrase,
         triggerUser: args.triggerUser ?? data.triggerComment?.author.login,
+        triggerName,
         commentId,
         triggerComment: data.triggerComment,
         issue: data.issue,
@@ -266,22 +325,23 @@ export async function runStandalone(args: CliArgs): Promise<void> {
     });
 
     claudeConclusion = result.conclusion;
+    responseText = result.responseText ?? "";
     console.log(`Claude execution: ${result.conclusion}`);
     if (result.sessionId) console.log(`Session ID: ${result.sessionId}`);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : String(err);
     console.error("Execution failed:", errorMessage);
   } finally {
-    // Always update tracking comment with result (success, failure, or error)
+    // Always update tracking comment with Claude's actual response or error
     if (commentId) {
       try {
         let body: string;
         if (errorMessage) {
           body = `Claude analysis encountered an error.\n\n\`\`\`\n${errorMessage.slice(0, 500)}\n\`\`\``;
+        } else if (responseText) {
+          body = responseText;
         } else {
-          const status =
-            claudeConclusion === "success" ? "completed" : "failed";
-          body = `Claude analysis ${status}. See execution output for details.`;
+          body = `Claude analysis ${claudeConclusion === "success" ? "completed" : "failed"} (no text output).`;
         }
         await withRetry(
           () => adapter.updateComment(owner, repo, commentId!, body),

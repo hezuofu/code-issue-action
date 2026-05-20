@@ -14,6 +14,7 @@ export type ClaudeRunResult = {
   sessionId?: string;
   conclusion: "success" | "failure";
   structuredOutput?: string;
+  responseText?: string;
 };
 
 const USER_REQUEST_FILENAME = "claude-user-request.txt";
@@ -101,6 +102,30 @@ function sanitizeSdkOutput(
   return null;
 }
 
+/** Extract Claude's assistant text responses from SDK messages into a single report. */
+function extractAssistantText(messages: SDKMessage[]): string {
+  const parts: string[] = [];
+  for (const msg of messages) {
+    if (msg.type !== "assistant") continue;
+    const content = (msg as { message?: { content?: unknown } }).message
+      ?.content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      if (
+        block &&
+        typeof block === "object" &&
+        "type" in block &&
+        block.type === "text" &&
+        "text" in block &&
+        typeof block.text === "string"
+      ) {
+        parts.push(block.text);
+      }
+    }
+  }
+  return parts.join("\n\n").trim();
+}
+
 export async function runClaudeWithSdk(
   promptPath: string,
   { sdkOptions, showFullOutput, hasJsonSchema }: ParsedSdkOptions,
@@ -139,6 +164,9 @@ export async function runClaudeWithSdk(
   const result: ClaudeRunResult = { conclusion: "failure" };
   const executionFile = await writeExecutionFile(messages);
   if (executionFile) result.executionFile = executionFile;
+
+  // Extract Claude's text response from assistant messages for the final report
+  result.responseText = extractAssistantText(messages);
 
   const initMessage = messages.find(
     (m) => m.type === "system" && "subtype" in m && m.subtype === "init",

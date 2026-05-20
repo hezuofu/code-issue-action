@@ -82,6 +82,8 @@ export function parseArgs(argv: string[]): CliArgs | { help: true } {
     model: raw["--model"],
     verbose: raw["verbose"] === "true",
     claudeArgs: raw["--claude-args"],
+    includeCommentsByActor: raw["--include-comments-by-actor"],
+    excludeCommentsByActor: raw["--exclude-comments-by-actor"],
     serverUrl: raw["--server-url"],
     apiBaseUrl: raw["--api-base-url"],
   };
